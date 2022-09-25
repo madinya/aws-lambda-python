@@ -1,0 +1,62 @@
+name: aws-python-lambda
+
+on:
+  push:
+    branches:
+      - "cd-process"
+
+jobs:
+  cd:
+    runs-on: ubuntu-latest
+    env:
+      WORKING_DIR: infrastructure/
+      AWS_ACCESS_KEY: ${{secrets.AWS_ACCESS_KEY}}
+      AWS_SECRET_KEY: ${{secrets.AWS_SECRET_KEY}}
+      AWS_REGION: ${{secrets.AWS_REGION}}
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v2
+
+      - name: Configure AWS credentials
+        uses: aws-actions/configure-aws-credentials@v1
+        with:
+          aws-access-key-id: ${{ env.AWS_ACCESS_KEY }}
+          aws-secret-access-key: ${{ env.AWS_SECRET_KEY }}
+          aws-region: ${{env.AWS_REGION}}
+
+      - name: Login to Amazon ECR
+        id: login-ecr
+        uses: aws-actions/amazon-ecr-login@v1
+
+      - name: Build, tag, and push Party bot image to Amazon ECR
+        env:
+          ECR_REGISTRY: ${{ steps.login-ecr.outputs.registry }}
+          ECR_REPOSITORY: ${{secrets.ECR_REPOSITORY}}
+          IMAGE_TAG: ${{ github.sha }}
+        run: |
+          docker build -f ./Dockerfile -t $ECR_REGISTRY/$ECR_REPOSITORY:$IMAGE_TAG .
+          docker push $ECR_REGISTRY/$ECR_REPOSITORY:$IMAGE_TAG
+
+      # - name: Setup terraform
+      #   uses: hashicorp/setup-terraform@v2
+      #   with:
+      #     terraform_version: 1.1.7
+
+      # - name: Terraform init
+      #   run: terraform init
+      #   working-directory: ${{ env.WORKING_DIR }}
+
+      # - name: Terraform Plan
+      #   id: plan
+      #   env:
+      #     AWS_ECR_REPOSITORY: ${{ format('{0}/{1}:{2}', steps.login-ecr.outputs.registry, secrets.ECR_REPOSITORY, github.sha) }}
+      #   run: terraform plan -no-color
+      #   working-directory: ${{ env.WORKING_DIR }}
+
+      # - name: Terraform Apply
+      #   id: apply
+      #   env:
+      #     AWS_ECR_REPOSITORY: ${{ format('{0}/{1}:{2}', steps.login-ecr.outputs.registry, secrets.ECR_REPOSITORY, github.sha) }}
+      #   run: terraform apply -auto-approve -input=false
+      #   working-directory: ${{ env.WORKING_DIR }}
